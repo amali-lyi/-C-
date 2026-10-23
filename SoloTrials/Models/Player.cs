@@ -1,16 +1,31 @@
 ﻿namespace SoloTrials.Models
 {
-    public class Player
+    public class Player : GameModel
     {
-        public int X { get; set; }
-        public int Y { get; set; }
-        public char Symbol { get; set; }
+        public int Coins { get; set; } = 0;
+        public int Health { get; set; }
+        public int MaxHealth { get; set; }
 
-        public Player(int x, int y)
+        public Player(int maxHealth) : base(0, 0, '*')
         {
-            X = x;
-            Y = y;
-            Symbol = '*';
+            Health = maxHealth;
+            MaxHealth = maxHealth;
+        }
+        public bool IsAlive()
+        {
+            if (Health <= 0)
+                return false;
+            else
+                return true;
+        }
+        public void TakeDamage(int damage)
+        {
+            if (IsAlive())
+            {
+                Health -= damage;
+                if (Health < 0)
+                    Health = 0;
+            }
         }
     }
 }
