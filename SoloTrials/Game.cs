@@ -31,30 +31,26 @@ namespace SoloTrials
                 {
                     case ConsoleKey.W:
                     case ConsoleKey.UpArrow:
-                        player.Y = Math.Max(0, player.Y - player.Speed);
+                        if (player.Y > 0)
+                            player.Y--;
                         break;
 
                     case ConsoleKey.S:
                     case ConsoleKey.DownArrow:
-                        player.Y = Math.Min(height - 1, player.Y + player.Speed);
+                        if (player.Y < height - 1)
+                            player.Y++;
                         break;
 
                     case ConsoleKey.A:
                     case ConsoleKey.LeftArrow:
-                        player.X = Math.Max(0, player.X - player.Speed);
+                        if (player.X > 0)
+                            player.X--;
                         break;
 
                     case ConsoleKey.D:
                     case ConsoleKey.RightArrow:
-                        player.X = Math.Min(width - 1, player.X + player.Speed);
-                        break;
-
-                    case ConsoleKey.R:
-                        player.Health = Math.Min(100, player.Health + 10);
-                        break;
-
-                    case ConsoleKey.F:
-                        player.Money += 10;
+                        if (player.X < width - 1)
+                            player.X++;
                         break;
 
                     case ConsoleKey.Escape:
@@ -84,13 +80,7 @@ namespace SoloTrials
             }
 
             Console.WriteLine();
-            Console.WriteLine($"Health: {player.Health}/100");
-            Console.WriteLine($"Money: {player.Money}");
-            Console.WriteLine($"Speed: {player.Speed}");
-            Console.WriteLine();
             Console.WriteLine("WASD or arrows - move");
-            Console.WriteLine("R - heal 10 health");
-            Console.WriteLine("F - get 10 coins");
             Console.WriteLine("Esc - exit");
         }
     }
