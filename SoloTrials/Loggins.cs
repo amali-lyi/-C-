@@ -1,6 +1,7 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
 namespace SoloTrials.Logging;
+
 [Flags]
 public enum LogLevel
 {
