@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using SoloTrials.Models;
+using SoloTrials.World;
 
 namespace SoloTrials
 {
@@ -13,8 +14,11 @@ namespace SoloTrials
 
         private Player player;
         private InputHandler input;
-        private int width = 20;
-        private int height = 10;
+        private int width = 50;
+        private int height = 20;
+        private char[,] map;
+        private bool levelCompleted = false;
+        private int currentLevel = 1;
 
         private List<Enemy> enemies = new List<Enemy>();
         private List<Coin> coins = new List<Coin>();
@@ -29,6 +33,9 @@ namespace SoloTrials
             player.X = 2;
             player.Y = 2;
             input = new InputHandler();
+            map = new char[height, width];
+
+            CreateMap();
         }
 
         private void CreateMap()
@@ -62,7 +69,6 @@ namespace SoloTrials
             map[height - 2, width - 2] = '*';
         }
 
-        // ---------- Спавн ----------
 
         private List<(int x, int y)> GetFreeCells()
         {
@@ -127,6 +133,7 @@ namespace SoloTrials
             }
         }
 
+
         public void Run()
         {
             Console.CursorVisible = false;
@@ -142,7 +149,7 @@ namespace SoloTrials
                 {
                     Draw();
 
-                ConsoleKey key = input.ReadInput();
+                    ConsoleKey key = input.ReadInput();
 
                     int newX = player.X;
                     int newY = player.Y;
@@ -155,23 +162,20 @@ namespace SoloTrials
                             newY--;
                             break;
 
-                    case ConsoleKey.S:
-                    case ConsoleKey.DownArrow:
-                        if (player.Y < height - 1)
-                            player.Y++;
-                        break;
+                        case ConsoleKey.S:
+                        case ConsoleKey.DownArrow:
+                            newY++;
+                            break;
 
-                    case ConsoleKey.A:
-                    case ConsoleKey.LeftArrow:
-                        if (player.X > 0)
-                            player.X--;
-                        break;
+                        case ConsoleKey.A:
+                        case ConsoleKey.LeftArrow:
+                            newX--;
+                            break;
 
-                    case ConsoleKey.D:
-                    case ConsoleKey.RightArrow:
-                        if (player.X < width - 1)
-                            player.X++;
-                        break;
+                        case ConsoleKey.D:
+                        case ConsoleKey.RightArrow:
+                            newX++;
+                            break;
 
                         case ConsoleKey.Escape:
                             running = false;
@@ -266,6 +270,7 @@ namespace SoloTrials
             }
 
             Console.CursorVisible = true;
+            Console.Clear();
         }
 
         private void CollectItems()
@@ -324,7 +329,6 @@ namespace SoloTrials
 
                 int stepX = Math.Sign(dx);
                 int stepY = Math.Sign(dy);
-
 
                 var attempts = new List<(int x, int y)>();
                 if (Math.Abs(dx) >= Math.Abs(dy))
