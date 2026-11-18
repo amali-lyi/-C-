@@ -1,4 +1,7 @@
-﻿using System;
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using SoloTrials.Models;
 using SoloTrials.World;
 
@@ -6,6 +9,10 @@ namespace SoloTrials
 {
     public class Game
     {
+        private const int PlayerDamage = 1;
+        private const int EnemyChaseDistance = 6;
+        private const int HudWidth = 70;
+
         private Player player;
         private InputHandler input;
         private int width = 50;
@@ -14,11 +21,17 @@ namespace SoloTrials
         private bool levelCompleted = false;
         private int currentLevel = 1;
 
+        private List<Enemy> enemies = new List<Enemy>();
+        private List<Coin> coins = new List<Coin>();
+        private List<Bonus> bonuses = new List<Bonus>();
+        private Random random = new Random();
+        private string message = "";
+
         public Game()
         {
-            player = new Player(3);
-            player.X = 2;
-            player.Y = 2;
+            player = new Player(3, 3);
+            player.MaxLives = 5;
+
             input = new InputHandler();
             map = new char[height, width];
 
@@ -56,9 +69,96 @@ namespace SoloTrials
             map[height - 2, width - 2] = '*';
         }
 
+        private List<(int x, int y)> GetFreeCells()
+        {
+            var cells = new List<(int x, int y)>();
+
+            for (int y = 1; y < height - 1; y++)
+            {
+                for (int x = 1; x < width - 1; x++)
+                {
+                    if (map[y, x] == ' ' &&
+                        !(x == player.X && y == player.Y))
+                    {
+                        cells.Add((x, y));
+                    }
+                }
+            }
+
+            return cells;
+        }
+
+        private (int x, int y) TakeRandomCell(List<(int x, int y)> cells)
+        {
+            int index = random.Next(cells.Count);
+            var cell = cells[index];
+            cells.RemoveAt(index);
+            return cell;
+        }
+
+        private void SpawnEntities()
+        {
+            enemies.Clear();
+            coins.Clear();
+            bonuses.Clear();
+
+            var cells = GetFreeCells();
+
+            var enemyCells = cells
+                .Where(c => Math.Abs(c.x - player.X) +
+                            Math.Abs(c.y - player.Y) > 8)
+                .ToList();
+
+            int enemyCount = 3 + currentLevel * 2;
+
+            for (int i = 0; i < enemyCount && enemyCells.Count > 0; i++)
+            {
+                var cell = TakeRandomCell(enemyCells);
+                cells.Remove(cell);
+
+                enemies.Add(new Enemy(
+                    2 + currentLevel,
+                    1,
+                    50 * currentLevel,
+                    cell.x,
+                    cell.y));
+            }
+
+            int coinCount = 10 + currentLevel * 2;
+
+            for (int i = 0; i < coinCount && cells.Count > 0; i++)
+            {
+                var cell = TakeRandomCell(cells);
+                coins.Add(new Coin(cell.x, cell.y, 1));
+            }
+
+            BonusType[] types =
+            {
+                BonusType.Heal,
+                BonusType.Heal,
+                BonusType.ExtraLife,
+                BonusType.ScoreBonus
+            };
+
+            foreach (var type in types)
+            {
+                if (cells.Count == 0)
+                    break;
+
+                var cell = TakeRandomCell(cells);
+                int amount = type == BonusType.ScoreBonus ? 100 : 1;
+
+                bonuses.Add(new Bonus(cell.x, cell.y, type, amount));
+            }
+        }
+
         public void Run()
         {
             Console.CursorVisible = false;
+            Console.Clear();
+
+            SpawnEntities();
+
             bool running = true;
 
             while (running)
@@ -131,6 +231,7 @@ namespace SoloTrials
                     player.Y = 1;
 
                     currentLevel = 2;
+                    SpawnEntities();
                 }
                 else
                 {
@@ -185,13 +286,15 @@ namespace SoloTrials
                 {
                     ConsoleKey key = input.ReadInput();
 
-                    if (key == ConsoleKey.D0 || key == ConsoleKey.NumPad0 ||
+                    if (key == ConsoleKey.D0 ||
+                        key == ConsoleKey.NumPad0 ||
                         key == ConsoleKey.Escape)
                     {
                         return false;
                     }
 
-                    if (key == ConsoleKey.D1 || key == ConsoleKey.NumPad1)
+                    if (key == ConsoleKey.D1 ||
+                        key == ConsoleKey.NumPad1)
                     {
                         return true;
                     }

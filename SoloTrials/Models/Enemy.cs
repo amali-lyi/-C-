@@ -6,8 +6,9 @@
         public int Health { get; set; }
         public int MaxHealth { get; set; }
         public int Damage { get; set; }
+        private bool _rewardGiven;
 
-        public Enemy(int maxHealth, int damage, int reward) : base(0, 0, 'X')
+        public Enemy(int maxHealth, int damage, int reward, int x = 0, int y = 0) : base(x, y, 'X')
         {
             MaxHealth = maxHealth;
             Health = maxHealth;
@@ -16,25 +17,33 @@
         }
         public bool IsAlive()
         {
-            if (Health <= 0)
-                return false;
-            else
-                return true;
+            return Health > 0;
         }
         public void TakeDamage(int damage)
         {
-            if(IsAlive())
+            if (IsAlive() && damage > 0)
             {
                 Health -= damage;
-                if(Health < 0)
+                if (Health < 0)
                     Health = 0;
             }
         }
         public void Attack(Player player)
         {
-            if(IsAlive())
+            if (IsAlive())
             {
                 player.TakeDamage(Damage);
+            }
+        }
+        public void TakeDamageFrom(Player player, int damage)
+        {
+            TakeDamage(damage);
+
+            if (!IsAlive() && !_rewardGiven)
+            {
+                _rewardGiven = true;
+                player.Coins += Reward;
+                player.AddScore(Reward);
             }
         }
     }
