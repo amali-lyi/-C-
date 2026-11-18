@@ -1,4 +1,5 @@
-﻿using System;
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -38,8 +39,7 @@ namespace SoloTrials
         {
             player = new Player(3, 3);
             player.MaxLives = 5;
-            player.X = 2;
-            player.Y = 2;
+
             input = new InputHandler();
             map = new char[height, width];
 
@@ -78,7 +78,6 @@ namespace SoloTrials
             map[height - 2, width - 2] = '*';
         }
 
-
         private List<(int x, int y)> GetFreeCells()
         {
             var cells = new List<(int x, int y)>();
@@ -87,8 +86,11 @@ namespace SoloTrials
             {
                 for (int x = 1; x < width - 1; x++)
                 {
-                    if (map[y, x] == ' ' && !(x == player.X && y == player.Y))
+                    if (map[y, x] == ' ' &&
+                        !(x == player.X && y == player.Y))
+                    {
                         cells.Add((x, y));
+                    }
                 }
             }
 
@@ -112,25 +114,41 @@ namespace SoloTrials
             var cells = GetFreeCells();
 
             var enemyCells = cells
-                .Where(c => Math.Abs(c.x - player.X) + Math.Abs(c.y - player.Y) > 8)
+                .Where(c => Math.Abs(c.x - player.X) +
+                            Math.Abs(c.y - player.Y) > 8)
                 .ToList();
 
             int enemyCount = 3 + currentLevel * 2;
+
             for (int i = 0; i < enemyCount && enemyCells.Count > 0; i++)
             {
                 var cell = TakeRandomCell(enemyCells);
                 cells.Remove(cell);
-                enemies.Add(new Enemy(2 + currentLevel, 1, 50 * currentLevel, cell.x, cell.y));
+
+                enemies.Add(new Enemy(
+                    2 + currentLevel,
+                    1,
+                    50 * currentLevel,
+                    cell.x,
+                    cell.y));
             }
 
             int coinCount = 10 + currentLevel * 2;
+
             for (int i = 0; i < coinCount && cells.Count > 0; i++)
             {
                 var cell = TakeRandomCell(cells);
                 coins.Add(new Coin(cell.x, cell.y, 1));
             }
 
-            BonusType[] types = { BonusType.Heal, BonusType.Heal, BonusType.ExtraLife, BonusType.ScoreBonus };
+            BonusType[] types =
+            {
+                BonusType.Heal,
+                BonusType.Heal,
+                BonusType.ExtraLife,
+                BonusType.ScoreBonus
+            };
+
             foreach (var type in types)
             {
                 if (cells.Count == 0)
@@ -138,23 +156,25 @@ namespace SoloTrials
 
                 var cell = TakeRandomCell(cells);
                 int amount = type == BonusType.ScoreBonus ? 100 : 1;
+
                 bonuses.Add(new Bonus(cell.x, cell.y, type, amount));
             }
         }
-
 
         public void Run()
         {
             Console.CursorVisible = false;
             Console.Clear();
+
             SpawnEntities();
+
             bool running = true;
 
             while (running)
             {
                 levelCompleted = false;
 
-                while (running && !levelCompleted && player.IsAlive())
+                while (running && !levelCompleted)
                 {
                     ApplyGravityAndDamage();
                     Draw();
@@ -195,11 +215,6 @@ namespace SoloTrials
 
                         case ConsoleKey.Escape:
                             running = false;
-                            isMoveKey = false;
-                            break;
-
-                        default:
-                            isMoveKey = false;
                             break;
                     }
 
@@ -265,17 +280,6 @@ namespace SoloTrials
                             levelCompleted = true;
                         }
                     }
-
-                    if (!levelCompleted && player.IsAlive())
-                    {
-                        EnemiesTurn();
-                    }
-                }
-
-                if (!player.IsAlive())
-                {
-                    ShowGameOver();
-                    break;
                 }
 
                 if (!running || !levelCompleted)
@@ -293,8 +297,6 @@ namespace SoloTrials
                     player.Y = 1;
 
                     currentLevel = 2;
-                    message = "";
-                    Console.Clear();
                     SpawnEntities();
                 }
                 else
@@ -500,16 +502,20 @@ namespace SoloTrials
         {
             Console.SetCursorPosition(0, 0);
 
-            Console.WriteLine($"LEVEL {currentLevel}".PadRight(HudWidth));
-            Console.WriteLine(
-                $"Lives: {player.Lives}/{player.MaxLives} | HP: {player.Health}/{player.MaxHealth} | " +
-                $"Coins: {player.Coins} | Score: {player.Score}".PadRight(HudWidth));
+            Console.WriteLine($"LEVEL {currentLevel}");
 
             for (int y = 0; y < height; y++)
             {
                 for (int x = 0; x < width; x++)
                 {
-                    Console.Write(GetSymbolAt(x, y));
+                    if (player.X == x && player.Y == y)
+                    {
+                        Console.Write(player.Symbol);
+                    }
+                    else
+                    {
+                        Console.Write(map[y, x]);
+                    }
                 }
 
                 Console.WriteLine();
@@ -521,7 +527,6 @@ namespace SoloTrials
             Console.WriteLine("* - finish | $ - coin | + - heal | L - life | B - bonus points | X - enemy".PadRight(HudWidth));
         }
 
-
         private bool ShowLevelMenu()
         {
             Console.Clear();
@@ -529,7 +534,6 @@ namespace SoloTrials
             if (currentLevel == 1)
             {
                 Console.WriteLine("LEVEL 1 COMPLETED!");
-                Console.WriteLine($"Score: {player.Score} | Coins: {player.Coins} | Lives: {player.Lives}");
                 Console.WriteLine();
                 Console.WriteLine("1. LEVEL 2");
                 Console.WriteLine("0. Exit");
@@ -538,13 +542,15 @@ namespace SoloTrials
                 {
                     ConsoleKey key = input.ReadInput();
 
-                    if (key == ConsoleKey.D0 || key == ConsoleKey.NumPad0 ||
+                    if (key == ConsoleKey.D0 ||
+                        key == ConsoleKey.NumPad0 ||
                         key == ConsoleKey.Escape)
                     {
                         return false;
                     }
 
-                    if (key == ConsoleKey.D1 || key == ConsoleKey.NumPad1)
+                    if (key == ConsoleKey.D1 ||
+                        key == ConsoleKey.NumPad1)
                     {
                         return true;
                     }
@@ -552,27 +558,12 @@ namespace SoloTrials
             }
 
             Console.WriteLine("LEVEL 2 COMPLETED!");
-            Console.WriteLine($"Final score: {player.Score} | Coins: {player.Coins} | Lives: {player.Lives}");
             Console.WriteLine();
             Console.WriteLine("Press any key to exit.");
 
             input.ReadInput();
 
             return false;
-        }
-
-        private void ShowGameOver()
-        {
-            Console.Clear();
-            Console.WriteLine("GAME OVER");
-            Console.WriteLine();
-            Console.WriteLine($"Level reached: {currentLevel}");
-            Console.WriteLine($"Coins: {player.Coins}");
-            Console.WriteLine($"Final score: {player.Score}");
-            Console.WriteLine();
-            Console.WriteLine("Press any key to exit.");
-
-            input.ReadInput();
         }
     }
 }

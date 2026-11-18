@@ -47,8 +47,8 @@
                     Map[y, x] = maze[y][x];
                 }
             }
-
-            Map[1, 1] = 'S';
+        
+        Map[1, 1] = 'S';
             Map[Height - 2, Width - 2] = '*';
         }
     }
