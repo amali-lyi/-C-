@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using SoloTrials.Models;
 using SoloTrials.World;
 
@@ -9,8 +10,15 @@ namespace SoloTrials
     public class Game
     {
         private const int PlayerDamage = 1;
-        private const int EnemyChaseDistance = 6;
+        private const int EnemyChaseDistance = 10;
         private const int HudWidth = 70;
+        private const int VirtualKeyA = 0x41;
+        private const int VirtualKeyD = 0x44;
+        private const int VirtualKeyLeft = 0x25;
+        private const int VirtualKeyRight = 0x27;
+
+        [DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int virtualKey);
 
         private Player player;
         private InputHandler input;
@@ -58,11 +66,12 @@ namespace SoloTrials
 
             for (int x = 1; x < width - 1; x++)
             {
-                if (x < 22 || x > 27)
+                if (x < 22 || x > 28)
                 {
                     map[5, x] = '#';
                     map[10, x] = '#';
                     map[15, x] = '#';
+                    
                 }
             }
 
@@ -147,6 +156,7 @@ namespace SoloTrials
 
                 while (running && !levelCompleted && player.IsAlive())
                 {
+                    ApplyGravityAndDamage();
                     Draw();
 
                     ConsoleKey key = input.ReadInput();
@@ -154,6 +164,7 @@ namespace SoloTrials
                     int newX = player.X;
                     int newY = player.Y;
                     bool isMoveKey = true;
+                    bool isJumpKey = false;
 
                     switch (key)
                     {
@@ -177,6 +188,11 @@ namespace SoloTrials
                             newX++;
                             break;
 
+                        case ConsoleKey.Spacebar:
+                            newY -= 3;
+                            isJumpKey = true;
+                            break;
+
                         case ConsoleKey.Escape:
                             running = false;
                             isMoveKey = false;
@@ -192,6 +208,22 @@ namespace SoloTrials
 
                     if (!isMoveKey)
                         continue;
+
+                    if (isJumpKey)
+                    {
+                        newY = player.Y;
+                        for (int step = 2; step <= 3; step++)
+                        {
+                            int candidateY = player.Y - step;
+                            if (candidateY < 0 || map[candidateY, player.X] == '#')
+                                break;
+
+                            newY = candidateY;
+                        }
+
+                        if (newY == player.Y)
+                            continue;
+                    }
 
                     if (newX < 0 || newX >= width ||
                         newY < 0 || newY >= height ||
@@ -223,6 +255,8 @@ namespace SoloTrials
                     {
                         player.X = newX;
                         player.Y = newY;
+
+                        ApplyGravityAndDamage();
 
                         CollectItems();
 
@@ -300,6 +334,82 @@ namespace SoloTrials
                 }
             }
             bonuses.RemoveAll(b => b.IsCollected);
+        }
+
+        private int ApplyGravity()
+        {
+            int rowsFallen = 0;
+
+            while (player.Y + 1 < height && map[player.Y + 1, player.X] != '#')
+            {
+                int horizontalDirection = GetHeldHorizontalDirection();
+
+                while (horizontalDirection == 0 && Console.KeyAvailable)
+                {
+                    ConsoleKey key = Console.ReadKey(true).Key;
+
+                    if (key == ConsoleKey.A || key == ConsoleKey.LeftArrow)
+                        horizontalDirection = -1;
+                    else if (key == ConsoleKey.D || key == ConsoleKey.RightArrow)
+                        horizontalDirection = 1;
+                }
+
+                MoveHorizontallyDuringFall(horizontalDirection);
+
+                if (player.Y + 1 >= height || map[player.Y + 1, player.X] == '#')
+                    break;
+
+                player.Y++;
+                rowsFallen++;
+                CollectItems();
+                Draw();
+                System.Threading.Thread.Sleep(80);
+            }
+
+            return rowsFallen;
+        }
+
+        private int GetHeldHorizontalDirection()
+        {
+            if (!OperatingSystem.IsWindows())
+                return 0;
+
+            if ((GetAsyncKeyState(VirtualKeyA) & 0x8000) != 0 ||
+                (GetAsyncKeyState(VirtualKeyLeft) & 0x8000) != 0)
+                return -1;
+
+            if ((GetAsyncKeyState(VirtualKeyD) & 0x8000) != 0 ||
+                (GetAsyncKeyState(VirtualKeyRight) & 0x8000) != 0)
+                return 1;
+
+            return 0;
+        }
+
+        private void MoveHorizontallyDuringFall(int direction)
+        {
+            if (direction == 0)
+                return;
+
+            int nextX = player.X + direction;
+            if (nextX >= 0 && nextX < width && map[player.Y, nextX] != '#')
+            {
+                player.X = nextX;
+                CollectItems();
+            }
+        }
+
+        private void ApplyGravityAndDamage()
+        {
+            int rowsFallen = ApplyGravity();
+            if (rowsFallen > 3)
+            {
+                int damage = rowsFallen / 3;
+                if (damage > 0)
+                {
+                    player.TakeDamage(damage);
+                    message = $"You fell {rowsFallen} line{(rowsFallen == 1 ? "" : "s")} and took {damage} damage!";
+                }
+            }
         }
 
 
@@ -407,7 +517,7 @@ namespace SoloTrials
 
             Console.WriteLine();
             Console.WriteLine(message.PadRight(HudWidth));
-            Console.WriteLine("WASD / Arrows - move (walk into X to attack) | Esc - exit".PadRight(HudWidth));
+            Console.WriteLine("WASD / Arrows - move and space to jump (walk into X to attack) | Esc - exit".PadRight(HudWidth));
             Console.WriteLine("* - finish | $ - coin | + - heal | L - life | B - bonus points | X - enemy".PadRight(HudWidth));
         }
 
