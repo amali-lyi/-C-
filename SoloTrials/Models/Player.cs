@@ -9,7 +9,7 @@
         public int Lives { get; private set; }
         public int MaxLives { get; set; }
 
-        public Player(int maxHealth, int lives = 3) : base(0, 0, '@')
+        public Player(int maxHealth, int lives = 3) : base(0, 0, '¤')
         {
             Health = maxHealth;
             MaxHealth = maxHealth;

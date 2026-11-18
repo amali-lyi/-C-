@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using SoloTrials.Models;
 using SoloTrials.World;
 
@@ -10,8 +11,15 @@ namespace SoloTrials
     public class Game
     {
         private const int PlayerDamage = 1;
-        private const int EnemyChaseDistance = 6;
+        private const int EnemyChaseDistance = 10;
         private const int HudWidth = 70;
+        private const int VirtualKeyA = 0x41;
+        private const int VirtualKeyD = 0x44;
+        private const int VirtualKeyLeft = 0x25;
+        private const int VirtualKeyRight = 0x27;
+
+        [DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int virtualKey);
 
         private Player player;
         private InputHandler input;
@@ -58,11 +66,12 @@ namespace SoloTrials
 
             for (int x = 1; x < width - 1; x++)
             {
-                if (x < 22 || x > 27)
+                if (x < 22 || x > 28)
                 {
                     map[5, x] = '#';
                     map[10, x] = '#';
                     map[15, x] = '#';
+                    
                 }
             }
 
@@ -167,12 +176,15 @@ namespace SoloTrials
 
                 while (running && !levelCompleted)
                 {
+                    ApplyGravityAndDamage();
                     Draw();
 
                     ConsoleKey key = input.ReadInput();
 
                     int newX = player.X;
                     int newY = player.Y;
+                    bool isMoveKey = true;
+                    bool isJumpKey = false;
 
                     switch (key)
                     {
@@ -196,18 +208,72 @@ namespace SoloTrials
                             newX++;
                             break;
 
+                        case ConsoleKey.Spacebar:
+                            newY -= 3;
+                            isJumpKey = true;
+                            break;
+
                         case ConsoleKey.Escape:
                             running = false;
                             break;
                     }
 
-                    if (running &&
-                        newX >= 0 && newX < width &&
-                        newY >= 0 && newY < height &&
-                        map[newY, newX] != '#')
+                    if (!running)
+                        break;
+
+                    if (!isMoveKey)
+                        continue;
+
+                    if (isJumpKey)
+                    {
+                        newY = player.Y;
+                        for (int step = 2; step <= 3; step++)
+                        {
+                            int candidateY = player.Y - step;
+                            if (candidateY < 0 || map[candidateY, player.X] == '#')
+                                break;
+
+                            newY = candidateY;
+                        }
+
+                        if (newY == player.Y)
+                            continue;
+                    }
+
+                    if (newX < 0 || newX >= width ||
+                        newY < 0 || newY >= height ||
+                        map[newY, newX] == '#')
+                    {
+                        continue;
+                    }
+
+                    message = "";
+
+                    Enemy target = enemies.FirstOrDefault(e => e.IsAlive() && e.X == newX && e.Y == newY);
+
+                    if (target != null)
+                    {
+                        target.TakeDamageFrom(player, PlayerDamage);
+
+                        if (!target.IsAlive())
+                        {
+                            message = $"Enemy defeated! +{target.Reward} points";
+                        }
+                        else
+                        {
+                            message = $"You hit the enemy ({target.Health}/{target.MaxHealth}).";
+                        }
+
+                        enemies.RemoveAll(e => !e.IsAlive());
+                    }
+                    else
                     {
                         player.X = newX;
                         player.Y = newY;
+
+                        ApplyGravityAndDamage();
+
+                        CollectItems();
 
                         if (map[player.Y, player.X] == '*')
                         {
@@ -243,6 +309,195 @@ namespace SoloTrials
             Console.Clear();
         }
 
+        private void CollectItems()
+        {
+            foreach (var coin in coins.Where(c => c.X == player.X && c.Y == player.Y).ToList())
+            {
+                coin.Collect(player);
+                message = $"Coin collected! +{coin.Value * Coin.ScorePerValue} points";
+            }
+            coins.RemoveAll(c => c.IsCollected);
+
+            foreach (var bonus in bonuses.Where(b => b.X == player.X && b.Y == player.Y).ToList())
+            {
+                bonus.Apply(player);
+
+                switch (bonus.Type)
+                {
+                    case BonusType.Heal:
+                        message = "Bonus: health restored!";
+                        break;
+                    case BonusType.ExtraLife:
+                        message = "Bonus: extra life!";
+                        break;
+                    case BonusType.ScoreBonus:
+                        message = $"Bonus: +{bonus.Amount} points!";
+                        break;
+                }
+            }
+            bonuses.RemoveAll(b => b.IsCollected);
+        }
+
+        private int ApplyGravity()
+        {
+            int rowsFallen = 0;
+
+            while (player.Y + 1 < height && map[player.Y + 1, player.X] != '#')
+            {
+                int horizontalDirection = GetHeldHorizontalDirection();
+
+                while (horizontalDirection == 0 && Console.KeyAvailable)
+                {
+                    ConsoleKey key = Console.ReadKey(true).Key;
+
+                    if (key == ConsoleKey.A || key == ConsoleKey.LeftArrow)
+                        horizontalDirection = -1;
+                    else if (key == ConsoleKey.D || key == ConsoleKey.RightArrow)
+                        horizontalDirection = 1;
+                }
+
+                MoveHorizontallyDuringFall(horizontalDirection);
+
+                if (player.Y + 1 >= height || map[player.Y + 1, player.X] == '#')
+                    break;
+
+                player.Y++;
+                rowsFallen++;
+                CollectItems();
+                Draw();
+                System.Threading.Thread.Sleep(80);
+            }
+
+            return rowsFallen;
+        }
+
+        private int GetHeldHorizontalDirection()
+        {
+            if (!OperatingSystem.IsWindows())
+                return 0;
+
+            if ((GetAsyncKeyState(VirtualKeyA) & 0x8000) != 0 ||
+                (GetAsyncKeyState(VirtualKeyLeft) & 0x8000) != 0)
+                return -1;
+
+            if ((GetAsyncKeyState(VirtualKeyD) & 0x8000) != 0 ||
+                (GetAsyncKeyState(VirtualKeyRight) & 0x8000) != 0)
+                return 1;
+
+            return 0;
+        }
+
+        private void MoveHorizontallyDuringFall(int direction)
+        {
+            if (direction == 0)
+                return;
+
+            int nextX = player.X + direction;
+            if (nextX >= 0 && nextX < width && map[player.Y, nextX] != '#')
+            {
+                player.X = nextX;
+                CollectItems();
+            }
+        }
+
+        private void ApplyGravityAndDamage()
+        {
+            int rowsFallen = ApplyGravity();
+            if (rowsFallen > 3)
+            {
+                int damage = rowsFallen / 3;
+                if (damage > 0)
+                {
+                    player.TakeDamage(damage);
+                    message = $"You fell {rowsFallen} line{(rowsFallen == 1 ? "" : "s")} and took {damage} damage!";
+                }
+            }
+        }
+
+
+        private bool IsCellFreeForEnemy(int x, int y)
+        {
+            if (x < 0 || x >= width || y < 0 || y >= height)
+                return false;
+
+            if (map[y, x] == '#')
+                return false;
+
+            return !enemies.Any(e => e.IsAlive() && e.X == x && e.Y == y);
+        }
+
+        private void EnemiesTurn()
+        {
+            foreach (var enemy in enemies.Where(e => e.IsAlive()).ToList())
+            {
+                if (!player.IsAlive())
+                    return;
+
+                int dx = player.X - enemy.X;
+                int dy = player.Y - enemy.Y;
+
+                if (Math.Abs(dx) + Math.Abs(dy) > EnemyChaseDistance)
+                    continue;
+
+                int stepX = Math.Sign(dx);
+                int stepY = Math.Sign(dy);
+
+                var attempts = new List<(int x, int y)>();
+                if (Math.Abs(dx) >= Math.Abs(dy))
+                {
+                    if (stepX != 0) attempts.Add((enemy.X + stepX, enemy.Y));
+                    if (stepY != 0) attempts.Add((enemy.X, enemy.Y + stepY));
+                }
+                else
+                {
+                    if (stepY != 0) attempts.Add((enemy.X, enemy.Y + stepY));
+                    if (stepX != 0) attempts.Add((enemy.X + stepX, enemy.Y));
+                }
+
+                foreach (var (tx, ty) in attempts)
+                {
+                    if (tx == player.X && ty == player.Y)
+                    {
+                        int livesBefore = player.Lives;
+                        enemy.Attack(player);
+                        string hit = player.Lives < livesBefore
+                            ? "An enemy hit you. You lost a life!"
+                            : "An enemy hit you!";
+                        message = (message + " " + hit).Trim();
+                        break;
+                    }
+
+                    if (IsCellFreeForEnemy(tx, ty))
+                    {
+                        enemy.X = tx;
+                        enemy.Y = ty;
+                        break;
+                    }
+                }
+            }
+        }
+
+
+        private char GetSymbolAt(int x, int y)
+        {
+            if (player.X == x && player.Y == y)
+                return player.Symbol;
+
+            foreach (var enemy in enemies)
+                if (enemy.X == x && enemy.Y == y)
+                    return enemy.Symbol;
+
+            foreach (var bonus in bonuses)
+                if (bonus.X == x && bonus.Y == y)
+                    return bonus.Symbol;
+
+            foreach (var coin in coins)
+                if (coin.X == x && coin.Y == y)
+                    return coin.Symbol;
+
+            return map[y, x];
+        }
+
         private void Draw()
         {
             Console.SetCursorPosition(0, 0);
@@ -267,8 +522,9 @@ namespace SoloTrials
             }
 
             Console.WriteLine();
-            Console.WriteLine("WASD / Arrows - move | Esc - exit");
-            Console.WriteLine("* - finish level");
+            Console.WriteLine(message.PadRight(HudWidth));
+            Console.WriteLine("WASD / Arrows - move and space to jump (walk into X to attack) | Esc - exit".PadRight(HudWidth));
+            Console.WriteLine("* - finish | $ - coin | + - heal | L - life | B - bonus points | X - enemy".PadRight(HudWidth));
         }
 
         private bool ShowLevelMenu()
