@@ -1,26 +1,60 @@
 ﻿namespace SoloTrials.Models
 {
-    public class Player
-    // updated player class 23 oktober...
+    public class Player : GameModel
     {
-        public int X { get; set; }
-        public int Y { get; set; }
-        public char Symbol { get; set; }
-
+        public int Coins { get; set; } = 0;
+        public int Score { get; private set; } = 0;
         public int Health { get; set; }
-        public int Money { get; set; }
-        public int Speed { get; set; }
-        
+        public int MaxHealth { get; set; }
+        public int Lives { get; private set; }
+        public int MaxLives { get; set; }
 
-        public Player(int x, int y)
+        public Player(int maxHealth, int lives = 3) : base(0, 0, '¤')
         {
-            X = x;
-            Y = y;
-            Symbol = '*';
+            Health = maxHealth;
+            MaxHealth = maxHealth;
+            Lives = lives;
+            MaxLives = lives;
+        }
+        public bool IsAlive()
+        {
+            return Lives > 0;
+        }
+        public void TakeDamage(int damage)
+        {
+            if (!IsAlive() || damage <= 0)
+                return;
 
-            Health = 100;
-            Money = 0;
-            Speed = 1;
+            Health -= damage;
+
+            if (Health <= 0)
+            {
+                Lives--;
+                Health = Lives > 0 ? MaxHealth : 0;
+            }
+        }
+        public void Heal(int amount)
+        {
+            if (!IsAlive() || amount <= 0)
+                return;
+
+            Health += amount;
+            if (Health > MaxHealth)
+                Health = MaxHealth;
+        }
+        public void AddLife(int count = 1)
+        {
+            if (count <= 0)
+                return;
+
+            Lives += count;
+            if (Lives > MaxLives)
+                Lives = MaxLives;
+        }
+        public void AddScore(int points)
+        {
+            if (points > 0)
+                Score += points;
         }
     }
 }
